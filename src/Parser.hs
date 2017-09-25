@@ -263,8 +263,7 @@ a_pkindex = pk_prefix *> pure (PK, "PK")
 
 pindex_prefix :: Stream s m Char => ParsecT s u m KeyType
 pindex_prefix = do
-  u <- optionMaybe $ string_ci "UNIQUE" <|> string_ci "FULLTEXT"
-  many1 space
+  u <- optionMaybe $ (string_ci "UNIQUE" <|> string_ci "FULLTEXT") <* many1 space
   string_ci_ "KEY" <|> string_ci_ "INDEX"
   many1 space
   return (if (isJust u) then UNIQUE_KEY else KEY)
