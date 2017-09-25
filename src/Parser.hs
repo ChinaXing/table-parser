@@ -256,7 +256,7 @@ a_column = do
 data KeyType = PK | UNIQUE_KEY | KEY deriving(Eq, Show)
 
 pk_prefix :: Stream s m Char => ParsecT s u m KeyType
-pk_prefix = string_ci_ "PRIMARY" *> many1 space *> string_ci_ "KEY" *> many1 space *> pure PK
+pk_prefix = string_ci_ "PRIMARY" *> many1 space *> string_ci_ "KEY" *> lookAhead space *> pure PK
 
 a_pkindex :: Stream s m Char => ParsecT s u m (KeyType, String)
 a_pkindex = pk_prefix *> pure (PK, "PK")
@@ -285,7 +285,9 @@ a_constraint = do
 a_index :: Stream s m Char => ParsecT s u m Index
 a_index = do
   (kt, name) <- a_pkindex <|> a_plainindex
-  columns <- paren_between $ ((back_qt $ alphaNum <|> char '_') <* (optional $ paren_qt alphaNum)) `sepBy` (char ',' *> spaces)
+  many1 space
+  columns <- paren_between $
+    ((back_qt $ alphaNum <|> char '_') <* (optional $ paren_qt alphaNum)) `sepBy` (char ',' *> spaces)
   optionMaybe $ try (spaces *> string_ci_ "USING " *> (string_ci_ "BTREE" <|> string_ci_ "HASH"))
   comment <- optionMaybe $
     try $ space *> string_ci_ "COMMENT" *> many1 space *> str_qt anyChar
