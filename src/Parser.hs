@@ -188,8 +188,8 @@ a_dataType = choice' [ a_inttype "INT"
                     , a_enumtype
                     , a_datetimetype
                     , a_datetype
-                    , a_timetype
                     , a_timestamptype
+                    , a_timetype
                     , a_yeartype]
 
 a_columnname :: (Stream s m Char) => ParsecT s u m String
