@@ -154,6 +154,11 @@ a_datetype = do
   string_ci_ "DATE"
   return $ DataType { t = "DATE", len = Nothing, unsigned = False }
 
+a_timetype :: (Stream s m Char) => ParsecT s u m DataType
+a_timetype = do
+  string_ci_ "TIME"
+  return $ DataType { t = "TIME", len = Nothing, unsigned = False }
+
 a_timestamptype :: (Stream s m Char) => ParsecT s u m DataType
 a_timestamptype = do
   string_ci "TIMESTAMP"
@@ -183,6 +188,7 @@ a_dataType = choice' [ a_inttype "INT"
                     , a_enumtype
                     , a_datetimetype
                     , a_datetype
+                    , a_timetype
                     , a_timestamptype
                     , a_yeartype]
 
