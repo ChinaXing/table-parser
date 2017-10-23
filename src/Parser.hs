@@ -210,7 +210,7 @@ a_updatedefaultvalue :: (Stream s m Char) => ParsecT s u m String
 a_updatedefaultvalue = space *> string_ci_ "ON" *> many1 space *> string_ci_ "UPDATE" *> space *> str_qt_optional anyChar
 
 a_comment :: (Stream s m Char) => ParsecT s u m String
-a_comment = space *> string_ci_ "COMMENT" *> space *> str_qt anyChar
+a_comment = space *> string_ci_ "COMMENT" *> many1 space *> str_qt anyChar
 
 a_autoincrement :: (Stream s m Char) => ParsecT s u m Bool
 a_autoincrement = space *> string_ci_ "AUTO_INCREMENT" *> return True
