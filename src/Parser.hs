@@ -98,20 +98,20 @@ a_datatype_optional_length ts = string_ci ts <* optional (paren_qt digit)
 a_inttype :: (Stream s m Char) => String -> ParsecT s u m DataType
 a_inttype ts = do
    t <- a_datatype_optional_length ts
-   u <- optionMaybe $ try (spaces *> string_ci_ "UNSIGNED")
+   u <- optionMaybe $ try (many1 space *> string_ci_ "UNSIGNED")
    return $ DataType { t = ts, len = Nothing, unsigned = (isJust u)}
 
 a_decimal :: (Stream s m Char) => ParsecT s u m DataType
 a_decimal = do
   string_ci "DECIMAL"
   optional $ try $ paren_qt $ char ',' <|> digit
-  u <- optionMaybe $ try (spaces *> string_ci "UNSIGNED")
+  u <- optionMaybe $ try (many1 space *> string_ci "UNSIGNED")
   return $ DataType { t = "DECIMAL", len = Nothing, unsigned = (isJust u)}
 
 a_chartype :: (Stream s m Char) => String -> ParsecT s u m DataType
 a_chartype ts = do
   t <- string_ci ts
-  len <- paren_qt  digit
+  len <- paren_qt digit
   return $ DataType { t = ts, len = (Just $ read len), unsigned = False }
 
 a_texttype :: (Stream s m Char) => String -> ParsecT s u m DataType
@@ -127,7 +127,7 @@ a_blobtype ts = do
 a_enumtype :: (Stream s m Char) => ParsecT s u m DataType
 a_enumtype = do
   string_ci "ENUM"
-  paren_between $ (spaces *> single_qt anyChar <* (optional spaces)) `sepBy` (char ',')
+  paren_between $ (many1 space *> single_qt anyChar <* (optional spaces)) `sepBy` (char ',')
   return $ DataType { t = "VARCHAR", len = Just 256, unsigned = False }
 
 a_datetimetype :: (Stream s m Char) => ParsecT s u m DataType
@@ -146,7 +146,7 @@ a_floattype :: (Stream s m Char) => String -> ParsecT s u m DataType
 a_floattype ts = do
   t <- string_ci ts
   optional $ try $ spaces *> char '(' *> many digit *> char ',' *> many digit *> char ')'
-  u <- optionMaybe $ try (spaces *> string_ci "UNSIGNED")
+  u <- optionMaybe $ try (many1 space *> string_ci "UNSIGNED")
   return $ DataType { t = ts, len = Nothing, unsigned = isJust u }
 
 a_datetype :: (Stream s m Char) => ParsecT s u m DataType
@@ -198,55 +198,57 @@ a_columnname =  notFollowedBy (pk_prefix <|> pindex_prefix) *>
 
 a_nullable :: (Stream s m Char) => ParsecT s u m Bool
 a_nullable = do
-  s <- spaces *> ((try $ string_ci "NOT NULL") <|> (try $ string_ci "NULL"))
-  return (map toUpper s /= "NOT NULL")
+  (try $ a_not_null >> return False) <|> (try $ a_null >> return True)
+  where
+    a_not_null = string_ci "NOT" *> many1 space *> string_ci "NULL"
+    a_null = string_ci "NULL"
 
 a_defaultvalue :: (Stream s m Char) => ParsecT s u m (Maybe String)
 a_defaultvalue =  do
-  space *> (string_ci_ "DEFAULT") *> space
+  (string_ci_ "DEFAULT") *> many1 space
   ((try $ string_ci_ "NULL") *> return Nothing) <|> (str_qt_optional anyChar >>= return . Just)
 
 a_updatedefaultvalue :: (Stream s m Char) => ParsecT s u m String
-a_updatedefaultvalue = space *> string_ci_ "ON" *> many1 space *> string_ci_ "UPDATE" *> space *> str_qt_optional anyChar
+a_updatedefaultvalue = string_ci_ "ON" *> many1 space *> string_ci_ "UPDATE" *> space *> str_qt_optional anyChar
 
 a_comment :: (Stream s m Char) => ParsecT s u m String
-a_comment = space *> string_ci_ "COMMENT" *> many1 space *> str_qt anyChar
+a_comment = string_ci_ "COMMENT" *> many1 space *> str_qt anyChar
 
 a_autoincrement :: (Stream s m Char) => ParsecT s u m Bool
-a_autoincrement = space *> string_ci_ "AUTO_INCREMENT" *> return True
+a_autoincrement = string_ci_ "AUTO_INCREMENT" *> return True
 
 a_pk :: (Stream s m Char) => ParsecT s u m Bool
-a_pk = space *> string_ci_ "PRIMARY" *> many1 space *> string_ci_ "KEY" *> return True
+a_pk = string_ci_ "PRIMARY" *> many1 space *> string_ci_ "KEY" *> return True
 
 a_collate :: (Stream s m Char) => ParsecT s u m String
 a_collate = do
   many1 space
   string_ci_ "COLLATE"
   many1 space
-  many (alphaNum <|> char '_')
+  many1 (alphaNum <|> char '_')
 
 a_charset :: (Stream s m Char) => ParsecT s u m String
 a_charset = do
   many1 space
   string_ci_ "CHARACTER SET"
   many1 space
-  many (alphaNum <|> char '_')
+  many1 (alphaNum <|> char '_')
 
 a_column :: (Stream s m Char) => ParsecT s u m Col
 a_column = do
   name <- a_columnname
-  spaces
+  many1 space
   dt <- a_dataType
-  optional $ try a_charset
-  optional $ try a_collate
-  optional $ try (spaces *> string "zerofill")
-  nullable1 <- optionMaybe  $ try a_nullable
-  defaultValue <-  optionMaybe $ try a_defaultvalue
-  updateDefault <- optionMaybe $ try a_updatedefaultvalue
-  pk <- option False $ try a_pk
-  autoIncrement <- option False $ try a_autoincrement
-  nullable2 <- optionMaybe $ try a_nullable
-  comment <- optionMaybe $ try a_comment
+  optional $ try (many1 space *> a_charset)
+  optional $ try (many1 space *> a_collate)
+  optional $ try (many1 space *> string "zerofill")
+  nullable1 <- optionMaybe  $ try (many1 space *> a_nullable)
+  defaultValue <-  optionMaybe $ try (many1 space *> a_defaultvalue)
+  updateDefault <- optionMaybe $ try (many1 space *> a_updatedefaultvalue)
+  pk <- option False $ try (many1 space *> a_pk)
+  autoIncrement <- option False $ try (many1 space *> a_autoincrement)
+  nullable2 <- optionMaybe $ try (many1 space *> a_nullable)
+  comment <- optionMaybe $ try (many1 space *> a_comment)
   let nullable = maybe True Prelude.id $ nullable1 CA.<|> nullable2
   return $ Col { idNum = 2
                , name = name
@@ -272,7 +274,7 @@ pindex_prefix = do
   u <- optionMaybe $ (string_ci "UNIQUE" <|> string_ci "FULLTEXT") <* many1 space
   string_ci_ "KEY" <|> string_ci_ "INDEX"
   many1 space
-  return (if (isJust u) then UNIQUE_KEY else KEY)
+  return $ maybe KEY (const UNIQUE_KEY) u
 
 a_plainindex :: Stream s m Char => ParsecT s u m (KeyType, String)
 a_plainindex = do
@@ -283,19 +285,19 @@ a_plainindex = do
 a_constraint :: Stream s m Char => ParsecT s u m ()
 a_constraint = do
   string_ci_ "CONSTRAINT "
-  spaces
+  many1 space
   manyTill anyChar (lookAhead $ char ',' <|> char '\n')
   return ()
 
 a_index :: Stream s m Char => ParsecT s u m Index
 a_index = do
   (kt, name) <- a_pkindex <|> a_plainindex
-  many1 space
+  spaces
   columns <- paren_between $
     ((back_qt $ alphaNum <|> char '_') <* (optional $ paren_qt alphaNum)) `sepBy` (char ',' *> spaces)
-  optionMaybe $ try (spaces *> string_ci_ "USING " *> (string_ci_ "BTREE" <|> string_ci_ "HASH"))
+  optionMaybe $ try (spaces *> string_ci_ "USING" *> many1 space*> (string_ci_ "BTREE" <|> string_ci_ "HASH"))
   comment <- optionMaybe $
-    try $ space *> string_ci_ "COMMENT" *> many1 space *> str_qt anyChar
+    try $ many1 space *> string_ci_ "COMMENT" *> many1 space *> str_qt anyChar
   return $ Index { iid = 1
                  , iname = name
                  , icolumns = columns
