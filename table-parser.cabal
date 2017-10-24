@@ -13,11 +13,9 @@ build-type:          Simple
 cabal-version:       >=1.10
 extra-source-files:  README.md
 
-executable table-parser
+library
   hs-source-dirs:      src
-  main-is:             Main.hs
-  default-language:    Haskell2010
-  other-modules:       TableParser
+  exposed-modules:     TableParser
                      , Parser
   build-depends:       base >= 4.7 && < 5
                      , aeson
@@ -26,16 +24,26 @@ executable table-parser
                      , parsec >= 3.1.11
                      , transformers
                      , text
-                     , directory
+  default-language:    Haskell2010
+
+executable table-parser-exe
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  default-language:    Haskell2010
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base >= 4.7 && < 5
+                     , table-parser
 
 test-suite table-parser-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
   build-depends:       base
-                     , table-parser
                      , hspec
+                     , parsec
+                     , table-parser
                      , directory
+  other-modules: ParserSpec
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 
