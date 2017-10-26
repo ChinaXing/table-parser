@@ -1,0 +1,20 @@
+CREATE TABLE `t_pay_record` (
+	  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT 'ID',
+	  `pay_mode` varchar(30) NOT NULL DEFAULT '' COMMENT '支付方式',
+	  `channel_code` varchar(100) NOT NULL DEFAULT '' COMMENT '渠道编码',
+	  `biz_partner` varchar(30) NOT NULL DEFAULT '' COMMENT '业务合作方',
+	  `account_code` varchar(20) NOT NULL DEFAULT '' COMMENT '账号',
+	  `command_type` tinyint(4) NOT NULL DEFAULT '0' COMMENT '指令类型',
+	  `bank` varchar(10) NOT NULL DEFAULT '' COMMENT '银行',
+	  `debit_credit` char(1) CHARACTER SET utf8 NOT NULL DEFAULT '' COMMENT '借贷类型',
+	  `amount` int(11) NOT NULL DEFAULT '0' COMMENT '额度',
+	  `currency` char(3) NOT NULL DEFAULT 'CNY' COMMENT '币种',
+	  `inner_order_id` varchar(50) NOT NULL DEFAULT '' COMMENT '内部订单号',
+	  `outer_order_id` varchar(50) NOT NULL DEFAULT '' COMMENT '外部订单号',
+	  `payee_id` varchar(45) NOT NULL DEFAULT '' COMMENT '收款人id',
+	  `gmt_create` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+	  `gmt_update` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '修改时间',
+	  `ext` varchar(1024) NOT NULL DEFAULT '' COMMENT '扩展信息',
+	  PRIMARY KEY (`id`),
+	  KEY `idx_combine` (`pay_mode`,`channel_code`,`biz_partner`,`inner_order_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=2595787 DEFAULT CHARSET=utf8mb4 ROW_FORMAT=DYNAMIC COMMENT='支付记录'

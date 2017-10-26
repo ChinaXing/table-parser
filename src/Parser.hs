@@ -222,15 +222,15 @@ a_pk = string_ci_ "PRIMARY" *> many1 space *> string_ci_ "KEY" *> return True
 
 a_collate :: (Stream s m Char) => ParsecT s u m String
 a_collate = do
-  many1 space
   string_ci_ "COLLATE"
   many1 space
   many1 (alphaNum <|> char '_')
 
 a_charset :: (Stream s m Char) => ParsecT s u m String
 a_charset = do
+  string_ci_ "CHARACTER"
   many1 space
-  string_ci_ "CHARACTER SET"
+  string_ci_ "SET"
   many1 space
   many1 (alphaNum <|> char '_')
 
