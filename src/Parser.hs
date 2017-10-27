@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -16,7 +17,6 @@ import qualified Data.List as DL
 import qualified Control.Applicative as CA (Alternative(empty), (<|>))
 
 
-
 data DataType = DataType
   { t :: String
   , len :: Maybe Int
@@ -24,30 +24,35 @@ data DataType = DataType
   } deriving(Eq, Show)
 
 data Col = Col
-  { idNum :: Int
+  { id :: Int
   , name :: String
   , dataType :: DataType
+  , charset :: Maybe String
+  , collate :: Maybe String
   , pk :: Bool
   , autoIncrement :: Bool
-  , null :: Bool
+  , nullAble :: Bool
   , defaultValue :: Maybe (Maybe String)
   , updateDefaultValue :: Maybe String
   , comment :: Maybe String
   } deriving(Eq, Show)
 
 data Index = Index
-  { iid :: Int
-  , iname :: String
-  , icolumns :: [String]
+  { id :: Int
+  , name :: String
+  , columns :: [String]
   , unique :: Bool
-  , ipk :: Bool
-  , icomment :: Maybe String
+  , pk :: Bool
+  , comment :: Maybe String
   } deriving(Eq, Show)
 
 data CreateTable = CreateTable
   { tableName :: String
   , columns :: [Col]
   , indices :: [Index]
+  , comment :: Maybe String
+  , charset :: Maybe String
+  , engine :: Maybe String
   } deriving(Eq, Show)
 
 --createTable :: GenParser Char st CreateTable
@@ -220,11 +225,14 @@ a_autoincrement = string_ci_ "AUTO_INCREMENT" *> return True
 a_pk :: (Stream s m Char) => ParsecT s u m Bool
 a_pk = string_ci_ "PRIMARY" *> many1 space *> string_ci_ "KEY" *> return True
 
-a_collate :: (Stream s m Char) => ParsecT s u m String
-a_collate = do
+a_collate :: (Stream s m Char) => String -> ParsecT s u m String
+a_collate charset = do
   string_ci_ "COLLATE"
   many1 space
-  many1 (alphaNum <|> char '_')
+  string charset
+  char '_'
+  b <- many1 alphaNum
+  return $ charset ++ "_" ++ b
 
 a_charset :: (Stream s m Char) => ParsecT s u m String
 a_charset = do
@@ -238,28 +246,22 @@ a_column :: (Stream s m Char) => ParsecT s u m Col
 a_column = do
   name <- a_columnname
   many1 space
-  dt <- a_dataType
-  optional $ try (many1 space *> a_charset)
-  optional $ try (many1 space *> a_collate)
+  dataType <- a_dataType
+  charset <- optionMaybe $ try (many1 space *> a_charset)
+  collate <- case charset of
+    Nothing -> return Nothing
+    Just c ->  optionMaybe $ try (many1 space *> a_collate c)
   optional $ try (many1 space *> string "zerofill")
   nullable1 <- optionMaybe  $ try (many1 space *> a_nullable)
   defaultValue <-  optionMaybe $ try (many1 space *> a_defaultvalue)
-  updateDefault <- optionMaybe $ try (many1 space *> a_updatedefaultvalue)
+  updateDefaultValue <- optionMaybe $ try (many1 space *> a_updatedefaultvalue)
   pk <- option False $ try (many1 space *> a_pk)
   autoIncrement <- option False $ try (many1 space *> a_autoincrement)
   nullable2 <- optionMaybe $ try (many1 space *> a_nullable)
   comment <- optionMaybe $ try (many1 space *> a_comment)
-  let nullable = maybe True Prelude.id $ nullable1 CA.<|> nullable2
-  return $ Col { idNum = 2
-               , name = name
-               , dataType = dt
-               , pk = pk
-               , autoIncrement = autoIncrement
-               , null = nullable
-               , defaultValue = defaultValue
-               , updateDefaultValue = updateDefault
-               , comment = comment
-               }
+  let nullAble = maybe True Prelude.id $ nullable1 CA.<|> nullable2
+      id = 0
+  return Col{..}
 
 data KeyType = PK | UNIQUE_KEY | KEY deriving(Eq, Show)
 
@@ -298,35 +300,31 @@ a_index = do
   optionMaybe $ try (spaces *> string_ci_ "USING" *> many1 space*> (string_ci_ "BTREE" <|> string_ci_ "HASH"))
   comment <- optionMaybe $
     try $ many1 space *> string_ci_ "COMMENT" *> many1 space *> str_qt anyChar
-  return $ Index { iid = 1
-                 , iname = name
-                 , icolumns = columns
-                 , unique = (kt == UNIQUE_KEY)
-                 , ipk = kt == PK
-                 , icomment = comment
-                 }
+  let unique = kt == UNIQUE_KEY
+      id = 0
+      pk = kt == PK
+  return Index{..}
 
 a_createtable :: Stream s m Char => ParsecT s u m CreateTable
 a_createtable = do
   string_ci_ "CREATE" *> many1 space *> string_ci_ "TABLE"
   many1 space
-  tablename <- back_qt_optional $ alphaNum <|> char '_'
+  tableName <- back_qt_optional $ alphaNum <|> char '_'
   spaces
-  (indices, cols) <- paren_between $ nl_space_around *> column_index_defs <* nl_space_around
+  (columns, indices) <- paren_between $ nl_space_around *> column_index_defs <* nl_space_around
+  spaces
+  engine <- optionMaybe $ try (string_ci_ "ENGINE=" *> many1 alphaNum)
+  optional $ try (many1 space *> string_ci_ "AUTO_INCREMENT=" *> many1 digit)
+  charset <- optionMaybe $ try (many1 space *> string_ci_ "DEFAULT" *> many1 space *> string_ci_ "CHARSET=" *> many1 alphaNum)
+  manyTill anyChar (eof <|> lookAhead ((char ';' >> return ()) <|> try (string_ci_ "COMMENT=")))
+  comment <- optionMaybe $ try (string_ci_ "COMMENT=" *> str_qt anyChar)
   manyTill anyChar (eof <|> lookAhead (char ';' >> return ()))
-  return $ CreateTable { tableName = tablename
-                       , columns = setColIdNum cols
-                       , indices = setIndexIdNum $ filter (\Index{..} -> iname /= "__X__") indices }
+  return CreateTable{..}
   where
-    setColIdNum = map (\(a, b) -> b { idNum = a } :: Col) . zip [1..]
-    setIndexIdNum = map (\(a, b) -> b { iid = a } :: Index) . zip [1..]
-    skipIndex = Left $
-      Index { iid = 0, iname = "__X__", icolumns = []
-            , unique = False, ipk = False, icomment = Nothing }
-    column_index_defs = (column_or_index `sepBy` seperator) >>= return . partitionEithers
-    column_or_index = (try a_constraint *> return skipIndex)
-                      <|> (try a_index >>= return . Left)
-                      <|> (a_column >>= return . Right)
+    column_index_defs = (column_or_index `sepBy` seperator) >>= return . partitionEithers >>= return . fmap (map fromJust . filter isJust)
+    column_or_index = (try a_constraint >> return (Right Nothing))
+                      <|> (try a_index >>= return . Right . Just)
+                      <|> (a_column >>= return . Left)
     seperator = try (spaces *> (char ',') *> spaces *> (optional $ char '\n') *> spaces)
     nl_space_around = spaces *> (optional $ char '\n') *> spaces
 

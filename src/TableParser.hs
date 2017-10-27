@@ -36,12 +36,14 @@ instance ToJSON DataType where
     ]
 instance ToJSON Col where
   toJSON Col{..} = object $
-    [ "id" .= idNum
+    [ "id" .= id
     , "name" .= name
     , "dataType" .= (toJSON dataType)
-    -- , "pk" .= pk
+    , "charset" .= maybe Null toJSON charset
+    , "collate" .= maybe Null toJSON collate
+    , "pk" .= pk
     , "autoIncrement" .= autoIncrement
-    , "nullAble" .= null
+    , "nullAble" .= nullAble
     , "defaultValue" .= maybe Null (\x -> object $ maybe [ "none" .= True ] (\j -> [ "some" .= toJSON j ]) x) defaultValue
     , "updateDefaultValue" .= maybe Null toJSON updateDefaultValue
     , "comment" .= maybe Null toJSON comment
@@ -49,14 +51,17 @@ instance ToJSON Col where
 
 instance ToJSON Index where
   toJSON Index{..} = object $
-    [ "id" .= iid
-    , "name" .= iname
-    , "columns" .= icolumns
+    [ "id" .= id
+    , "name" .= name
+    , "columns" .= columns
     , "unique" .= unique
-    , "pk" .= ipk
-    , "comment" .= maybe Null toJSON icomment]
+    , "pk" .= pk
+    , "comment" .= maybe Null toJSON comment]
 instance ToJSON CreateTable where
   toJSON CreateTable{..} = object $
     [ "indices" .= indices
     , "name" .= tableName
-    , "columns" .= columns ]
+    , "columns" .= columns
+    , "comment" .= comment
+    , "charset" .= charset
+    , "engine" .= engine]

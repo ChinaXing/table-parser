@@ -8,7 +8,7 @@ CREATE TABLE `t_pay_record` (
 	  `bank` varchar(10) NOT NULL DEFAULT '' COMMENT '银行',
 	  `debit_credit` char(1) CHARACTER SET utf8 NOT NULL DEFAULT '' COMMENT '借贷类型',
 	  `amount` int(11) NOT NULL DEFAULT '0' COMMENT '额度',
-	  `currency` char(3) NOT NULL DEFAULT 'CNY' COMMENT '币种',
+	  `currency` char(3) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT 'CNY' COMMENT '币种',
 	  `inner_order_id` varchar(50) NOT NULL DEFAULT '' COMMENT '内部订单号',
 	  `outer_order_id` varchar(50) NOT NULL DEFAULT '' COMMENT '外部订单号',
 	  `payee_id` varchar(45) NOT NULL DEFAULT '' COMMENT '收款人id',
