@@ -64,4 +64,5 @@ instance ToJSON CreateTable where
     , "columns" .= columns
     , "comment" .= comment
     , "charset" .= charset
+    , "collate" .= collate
     , "engine" .= engine]

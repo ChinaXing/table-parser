@@ -52,6 +52,7 @@ data CreateTable = CreateTable
   , indices :: [Index]
   , comment :: Maybe String
   , charset :: Maybe String
+  , collate :: Maybe String
   , engine :: Maybe String
   } deriving(Eq, Show)
 
@@ -225,14 +226,14 @@ a_autoincrement = string_ci_ "AUTO_INCREMENT" *> return True
 a_pk :: (Stream s m Char) => ParsecT s u m Bool
 a_pk = string_ci_ "PRIMARY" *> many1 space *> string_ci_ "KEY" *> return True
 
-a_collate :: (Stream s m Char) => String -> ParsecT s u m String
+a_collate :: (Stream s m Char) => Maybe String -> ParsecT s u m String
 a_collate charset = do
   string_ci_ "COLLATE"
   many1 space
-  string charset
+  cs <- maybe (many1 alphaNum) string charset
   char '_'
   b <- many1 alphaNum
-  return $ charset ++ "_" ++ b
+  return $ cs ++ "_" ++ b
 
 a_charset :: (Stream s m Char) => ParsecT s u m String
 a_charset = do
@@ -248,9 +249,7 @@ a_column = do
   many1 space
   dataType <- a_dataType
   charset <- optionMaybe $ try (many1 space *> a_charset)
-  collate <- case charset of
-    Nothing -> return Nothing
-    Just c ->  optionMaybe $ try (many1 space *> a_collate c)
+  collate <- optionMaybe $ try (many1 space *> a_collate charset)
   optional $ try (many1 space *> string "zerofill")
   nullable1 <- optionMaybe  $ try (many1 space *> a_nullable)
   defaultValue <-  optionMaybe $ try (many1 space *> a_defaultvalue)
@@ -316,6 +315,12 @@ a_createtable = do
   engine <- optionMaybe $ try (string_ci_ "ENGINE=" *> many1 alphaNum)
   optional $ try (many1 space *> string_ci_ "AUTO_INCREMENT=" *> many1 digit)
   charset <- optionMaybe $ try (many1 space *> string_ci_ "DEFAULT" *> many1 space *> string_ci_ "CHARSET=" *> many1 alphaNum)
+  collate <- optionMaybe $ try $ do
+    many1 space *> string_ci_ "COLLATE="
+    cs <- maybe (many1 alphaNum) string charset
+    char '_'
+    cl <- many1 alphaNum
+    return $ cs ++ "_" ++ cl
   manyTill anyChar (eof <|> lookAhead ((char ';' >> return ()) <|> try (string_ci_ "COMMENT=")))
   comment <- optionMaybe $ try (string_ci_ "COMMENT=" *> str_qt anyChar)
   manyTill anyChar (eof <|> lookAhead (char ';' >> return ()))
