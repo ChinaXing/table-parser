@@ -1,10 +1,6 @@
-CREATE TABLE `t_pay_record` (
-	  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT 'ID',
-	  `currency` char(3) COLLATE utf8mb4_bin NOT NULL DEFAULT 'CNY' COMMENT '币种',
-	  `inner_order_id` varchar(50) NOT NULL DEFAULT '' COMMENT '内部订单号',
-	  `payee_id` varchar(45) NOT NULL DEFAULT '' COMMENT '收款人id',
-	  `gmt_update` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '修改时间',
-	  `ext` varchar(1024) NOT NULL DEFAULT '' COMMENT '扩展信息',
-	  PRIMARY KEY (`id`),
-	  KEY `idx_combine` (`pay_mode`,`channel_code`,`biz_partner`,`inner_order_id`)
-) engine=innodb collate=uf8mb4_bin comment='hello'
+CREATE TABLE `clue_bind_data` (
+  `assign_source` TINYINT NOT NULL DEFAULT '1' COMMENT '分配来源: 1:系统分配 2:人工分配 3:自主认领',
+  PRIMARY KEY (`id`),
+  KEY `idx_mobile` (`mobile`) COMMENT '支持mobile的模糊查询',
+  KEY `idx_name` (`name`) COMMENT '支持name模糊匹配'
+) ENGINE=INNODB CHARSET=utf8mb4 collate = utf8mb4_bin COMMENT = 'ok';

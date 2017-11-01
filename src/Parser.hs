@@ -304,6 +304,15 @@ a_index = do
       pk = kt == PK
   return Index{..}
 
+a_key :: Stream s m Char => String -> ParsecT s u m String
+a_key k = (string_ci k) <*  spaces <*  char '=' <* spaces
+
+a_tb_charset :: Stream s m Char => ParsecT s u m String
+a_tb_charset = do
+  optional $ try (string_ci_ "DEFAULT" *> many1 space)
+  a_key "CHARSET"
+  many1 alphaNum
+
 a_createtable :: Stream s m Char => ParsecT s u m CreateTable
 a_createtable = do
   string_ci_ "CREATE" *> many1 space *> string_ci_ "TABLE"
@@ -312,17 +321,18 @@ a_createtable = do
   spaces
   (columns, indices) <- paren_between $ nl_space_around *> column_index_defs <* nl_space_around
   spaces
-  engine <- optionMaybe $ try (string_ci_ "ENGINE=" *> many1 alphaNum)
-  optional $ try (many1 space *> string_ci_ "AUTO_INCREMENT=" *> many1 digit)
-  charset <- optionMaybe $ try (many1 space *> string_ci_ "DEFAULT" *> many1 space *> string_ci_ "CHARSET=" *> many1 alphaNum)
+  engine <- optionMaybe $ try (a_key "ENGINE" *> many1 alphaNum)
+  optional $ try (many1 space *> a_key "AUTO_INCREMENT" *> many1 digit)
+  charset <- optionMaybe $ try (many1 space *> a_tb_charset)
   collate <- optionMaybe $ try $ do
-    many1 space *> string_ci_ "COLLATE="
-    cs <- maybe (many1 alphaNum) string charset
+    many1 space
+    a_key "COLLATE"
+    cs <- maybe (many1 alphaNum) string_ci charset
     char '_'
-    cl <- many1 alphaNum
-    return $ cs ++ "_" ++ cl
-  manyTill anyChar (eof <|> lookAhead ((char ';' >> return ()) <|> try (string_ci_ "COMMENT=")))
-  comment <- optionMaybe $ try (string_ci_ "COMMENT=" *> str_qt anyChar)
+    co <- many1 alphaNum
+    return $ cs ++ "_" ++ co
+  manyTill anyChar (eof <|> lookAhead ((char ';' >> return ()) <|> try (a_key "COMMENT" >> return ())))
+  comment <- optionMaybe $ try (a_key "COMMENT" *> str_qt anyChar)
   manyTill anyChar (eof <|> lookAhead (char ';' >> return ()))
   return CreateTable{..}
   where
