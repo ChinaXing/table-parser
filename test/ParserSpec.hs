@@ -12,9 +12,9 @@ main :: IO ()
 main = hspec spec
 
 spec :: Spec
-spec = do
+spec =
   describe "test parser create table ..." $ do
     tests <- runIO $ listDirectory "./test/t"
     forM_ tests $ \t -> do
-      result <- runIO $ (readFile ("./test/t/" ++ t) >>= return . parse a_createtable t)
-      it ("parse : " ++ t) $ do result `shouldSatisfy` isRight
+      result <- runIO $ liftM (parse aCreateTable t) (readFile ("./test/t/" ++ t))
+      it ("parse : " ++ t) $ result `shouldSatisfy` isRight

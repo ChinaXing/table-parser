@@ -2,9 +2,8 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DeriveGeneric #-}
 
-module Parser (a_createtable, a_tables, DataType(..), Col(..), Index(..), CreateTable(..)) where
+module Parser (aCreateTable, aTables, DataType(..), Col(..), Index(..), CreateTable(..)) where
 
 import Text.Parsec.Prim
 import Text.Parsec.Combinator
@@ -58,290 +57,287 @@ data CreateTable = CreateTable
 
 --createTable :: GenParser Char st CreateTable
 
-string_ci :: (Stream s m Char) => String -> ParsecT s u m String
-string_ci s = foldM (\r c -> satisfy (\c' -> c' == c || (toUpper c' == toUpper c)) >>= return . (:r))
-                [] s >>= return . reverse
+stringCi :: (Stream s m Char) => String -> ParsecT s u m String
+stringCi s = liftM reverse (foldM (\r c -> liftM (:r) (satisfy (\c' -> c' == c || (toUpper c' == toUpper c)))) [] s)
 
-string_ci_ :: (Stream s m Char) => String -> ParsecT s u m ()
-string_ci_ = foldM (\() c -> satisfy (\c' -> c' == c || (toUpper c' == toUpper c)) >> return ()) ()
+stringCi_ :: (Stream s m Char) => String -> ParsecT s u m ()
+stringCi_ = foldM (\() c -> void (satisfy (\c' -> c' == c || (toUpper c' == toUpper c)))) ()
 
 qt :: (Stream s m Char) => Char -> Char -> ParsecT s u m a -> ParsecT s u m [a]
 qt l r p = char l *> manyTill p (char r)
 
-paren_between :: Stream s m Char => ParsecT s u m a -> ParsecT s u m a
-paren_between = between (char '(') (char ')')
+parenBetween :: Stream s m Char => ParsecT s u m a -> ParsecT s u m a
+parenBetween = between (char '(') (char ')')
 
-str_qt :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
-str_qt p = single_qt p <|> qt '"' '"' p
+strQuote :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
+strQuote p = singleQuote p <|> qt '"' '"' p
 
 choice' :: Stream s m  Char => [ParsecT s u m a] -> ParsecT s u m a
 choice' = foldl (\r i -> r <|> try i) CA.empty
 
-qt_optional :: Stream s m Char => Char -> Char -> ParsecT s u m a -> ParsecT s u m [a]
-qt_optional l r p = (qt l r p) <|> manyTill p (lookAhead $ oneOf "\n,) ")
+quoteOptional :: Stream s m Char => Char -> Char -> ParsecT s u m a -> ParsecT s u m [a]
+quoteOptional l r p = qt l r p <|> manyTill p (lookAhead $ oneOf "\n,) ")
 
-single_qt :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
-single_qt  = qt '\'' '\''
+singleQuote :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
+singleQuote  = qt '\'' '\''
 
-single_qt_optional :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
-single_qt_optional p = single_qt p <|> manyTill p (lookAhead $ oneOf "\n,) ")
+singleQuoteOptional :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
+singleQuoteOptional p = singleQuote p <|> manyTill p (lookAhead $ oneOf "\n,) ")
 
-str_qt_optional :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
-str_qt_optional p = str_qt p <|> manyTill p (lookAhead $ oneOf "\n,) ")
+strQuoteOptional :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
+strQuoteOptional p = strQuote p <|> manyTill p (lookAhead $ oneOf "\n,) ")
 
-paren_qt :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
-paren_qt = qt '(' ')'
+parenQuote :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
+parenQuote = qt '(' ')'
 
-back_qt :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
-back_qt = qt '`' '`'
+backQuote :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
+backQuote = qt '`' '`'
 
-back_qt_optional :: Stream s m Char => ParsecT s u m a  -> ParsecT s u m [a]
-back_qt_optional p = qt '`' '`' p <|> manyTill p (lookAhead $ oneOf "\n,) ")
+backQuoteOptional :: Stream s m Char => ParsecT s u m a  -> ParsecT s u m [a]
+backQuoteOptional p = qt '`' '`' p <|> manyTill p (lookAhead $ oneOf "\n,) ")
 
-a_datatype_optional_length :: (Stream s m Char) => String -> ParsecT s u m String
-a_datatype_optional_length ts = string_ci ts <* optional (paren_qt digit)
+aDataTypeOptionalLength :: (Stream s m Char) => String -> ParsecT s u m String
+aDataTypeOptionalLength ts = stringCi ts <* optional (parenQuote digit)
 
-a_inttype :: (Stream s m Char) => String -> ParsecT s u m DataType
-a_inttype ts = do
-   t <- a_datatype_optional_length ts
-   u <- optionMaybe $ try (many1 space *> string_ci_ "UNSIGNED")
-   return $ DataType { t = ts, len = Nothing, unsigned = (isJust u)}
+aIntType :: (Stream s m Char) => String -> ParsecT s u m DataType
+aIntType ts = do
+   t <- aDataTypeOptionalLength ts
+   u <- optionMaybe $ try (many1 space *> stringCi_ "UNSIGNED")
+   return DataType { t = ts, len = Nothing, unsigned = isJust u}
 
-a_decimal :: (Stream s m Char) => ParsecT s u m DataType
-a_decimal = do
-  string_ci "DECIMAL"
-  optional $ try $ paren_qt $ char ',' <|> digit
-  u <- optionMaybe $ try (many1 space *> string_ci "UNSIGNED")
-  return $ DataType { t = "DECIMAL", len = Nothing, unsigned = (isJust u)}
+aDecimal :: (Stream s m Char) => ParsecT s u m DataType
+aDecimal = do
+  stringCi "DECIMAL"
+  optional $ try $ parenQuote $ char ',' <|> digit
+  u <- optionMaybe $ try (many1 space *> stringCi "UNSIGNED")
+  return DataType { t = "DECIMAL", len = Nothing, unsigned = isJust u}
 
-a_chartype :: (Stream s m Char) => String -> ParsecT s u m DataType
-a_chartype ts = do
-  t <- string_ci ts
-  len <- paren_qt digit
-  return $ DataType { t = ts, len = (Just $ read len), unsigned = False }
+aCharType :: (Stream s m Char) => String -> ParsecT s u m DataType
+aCharType ts = do
+  t <- stringCi ts
+  len <- parenQuote digit
+  return DataType { t = ts, len = Just $ read len, unsigned = False }
 
-a_texttype :: (Stream s m Char) => String -> ParsecT s u m DataType
-a_texttype ts = do
-  t <- string_ci ts
-  return $ DataType { t = ts, len = Nothing, unsigned = False }
+aTextType :: (Stream s m Char) => String -> ParsecT s u m DataType
+aTextType ts = do
+  t <- stringCi ts
+  return DataType { t = ts, len = Nothing, unsigned = False }
 
-a_blobtype :: (Stream s m Char) => String -> ParsecT s u m DataType
-a_blobtype ts = do
-  t <- string_ci ts
-  return $ DataType { t = ts, len = Nothing, unsigned = False }
+aBlobType :: (Stream s m Char) => String -> ParsecT s u m DataType
+aBlobType ts = do
+  t <- stringCi ts
+  return DataType { t = ts, len = Nothing, unsigned = False }
 
-a_enumtype :: (Stream s m Char) => ParsecT s u m DataType
-a_enumtype = do
-  string_ci "ENUM"
-  paren_between $ (many1 space *> single_qt anyChar <* (optional spaces)) `sepBy` (char ',')
-  return $ DataType { t = "VARCHAR", len = Just 256, unsigned = False }
+aEnumType :: (Stream s m Char) => ParsecT s u m DataType
+aEnumType = do
+  stringCi "ENUM"
+  parenBetween $ (many1 space *> singleQuote anyChar <* optional spaces) `sepBy` char ','
+  return DataType { t = "VARCHAR", len = Just 256, unsigned = False }
 
-a_datetimetype :: (Stream s m Char) => ParsecT s u m DataType
-a_datetimetype = do
-  string_ci_ "DATETIME"
-  optional $ try $ paren_qt digit
-  return $ DataType { t = "DATETIME", len = Nothing, unsigned = False }
+aDateTimeType :: (Stream s m Char) => ParsecT s u m DataType
+aDateTimeType = do
+  stringCi_ "DATETIME"
+  optional $ try $ parenQuote digit
+  return DataType { t = "DATETIME", len = Nothing, unsigned = False }
 
-a_yeartype :: (Stream s m Char) => ParsecT s u m DataType
-a_yeartype = do
-  string_ci_ "YEAR"
-  optional $ try $ paren_qt digit
-  return $ DataType { t = "YEAR", len = Nothing, unsigned = False }
+aYearType :: (Stream s m Char) => ParsecT s u m DataType
+aYearType = do
+  stringCi_ "YEAR"
+  optional $ try (parenQuote digit)
+  return DataType { t = "YEAR", len = Nothing, unsigned = False }
 
-a_floattype :: (Stream s m Char) => String -> ParsecT s u m DataType
-a_floattype ts = do
-  t <- string_ci ts
+aFloatType :: (Stream s m Char) => String -> ParsecT s u m DataType
+aFloatType ts = do
+  t <- stringCi ts
   optional $ try $ spaces *> char '(' *> many digit *> char ',' *> many digit *> char ')'
-  u <- optionMaybe $ try (many1 space *> string_ci "UNSIGNED")
-  return $ DataType { t = ts, len = Nothing, unsigned = isJust u }
+  u <- optionMaybe $ try (many1 space *> stringCi "UNSIGNED")
+  return DataType { t = ts, len = Nothing, unsigned = isJust u }
 
-a_datetype :: (Stream s m Char) => ParsecT s u m DataType
-a_datetype = do
-  string_ci_ "DATE"
-  return $ DataType { t = "DATE", len = Nothing, unsigned = False }
+aDateType :: (Stream s m Char) => ParsecT s u m DataType
+aDateType = do
+  stringCi_ "DATE"
+  return DataType { t = "DATE", len = Nothing, unsigned = False }
 
-a_timetype :: (Stream s m Char) => ParsecT s u m DataType
-a_timetype = do
-  string_ci_ "TIME"
-  return $ DataType { t = "TIME", len = Nothing, unsigned = False }
+aTimeType :: (Stream s m Char) => ParsecT s u m DataType
+aTimeType = do
+  stringCi_ "TIME"
+  return DataType { t = "TIME", len = Nothing, unsigned = False }
 
-a_timestamptype :: (Stream s m Char) => ParsecT s u m DataType
-a_timestamptype = do
-  string_ci "TIMESTAMP"
-  return $ DataType { t = "TIMESTAMP", len = Nothing, unsigned = False }
+aTimestampType :: (Stream s m Char) => ParsecT s u m DataType
+aTimestampType = do
+  stringCi "TIMESTAMP"
+  return DataType { t = "TIMESTAMP", len = Nothing, unsigned = False }
 
-a_dataType :: (Stream s m Char) => ParsecT s u m DataType
-a_dataType = choice' [ a_inttype "INT"
-                    , a_inttype "BIGINT"
-                    , a_inttype "SMALLINT"
-                    , a_inttype "TINYINT"
-                    , a_inttype "MEDIUMINT"
-                    , a_inttype "BIT"
-                    , a_decimal
-                    , a_floattype "FLOAT"
-                    , a_floattype "DOUBLE"
-                    , a_chartype "CHAR"
-                    , a_chartype "VARCHAR"
-                    , a_chartype "BINARY"
-                    , a_chartype "VARBINARY"
-                    , a_texttype "TEXT"
-                    , a_texttype "TINYTEXT"
-                    , a_texttype "MEDIUMTEXT"
-                    , a_texttype "LONGTEXT"
-                    , a_blobtype "BLOB"
-                    , a_blobtype "MEDIUMBLOB"
-                    , a_blobtype "LONGBLOB"
-                    , a_enumtype
-                    , a_datetimetype
-                    , a_datetype
-                    , a_timestamptype
-                    , a_timetype
-                    , a_yeartype]
+aDataType :: (Stream s m Char) => ParsecT s u m DataType
+aDataType = choice' [ aIntType "INT"
+                    , aIntType "BIGINT"
+                    , aIntType "SMALLINT"
+                    , aIntType "TINYINT"
+                    , aIntType "MEDIUMINT"
+                    , aIntType "BIT"
+                    , aDecimal
+                    , aFloatType "FLOAT"
+                    , aFloatType "DOUBLE"
+                    , aCharType "CHAR"
+                    , aCharType "VARCHAR"
+                    , aCharType "BINARY"
+                    , aCharType "VARBINARY"
+                    , aTextType "TEXT"
+                    , aTextType "TINYTEXT"
+                    , aTextType "MEDIUMTEXT"
+                    , aTextType "LONGTEXT"
+                    , aBlobType "BLOB"
+                    , aBlobType "MEDIUMBLOB"
+                    , aBlobType "LONGBLOB"
+                    , aEnumType
+                    , aDateTimeType
+                    , aDateType
+                    , aTimestampType
+                    , aTimeType
+                    , aYearType]
 
-a_columnname :: (Stream s m Char) => ParsecT s u m String
-a_columnname =  notFollowedBy (pk_prefix <|> pindex_prefix) *>
-                  (back_qt_optional $ alphaNum <|> char '_' <|> char ' ')
+aColumnname :: (Stream s m Char) => ParsecT s u m String
+aColumnname =  notFollowedBy (aPkPrefix <|> aPlainIndexPrefix) *>
+                  backQuoteOptional (alphaNum <|> char '_' <|> char ' ')
 
-a_nullable :: (Stream s m Char) => ParsecT s u m Bool
-a_nullable = do
-  (try $ a_not_null >> return False) <|> (try $ a_null >> return True)
+aNullable :: (Stream s m Char) => ParsecT s u m Bool
+aNullable = try (a_not_null >> return False) <|> try (a_null >> return True)
   where
-    a_not_null = string_ci "NOT" *> many1 space *> string_ci "NULL"
-    a_null = string_ci "NULL"
+    a_not_null = stringCi "NOT" *> many1 space *> stringCi "NULL"
+    a_null = stringCi "NULL"
 
-a_defaultvalue :: (Stream s m Char) => ParsecT s u m (Maybe String)
-a_defaultvalue =  do
-  (string_ci_ "DEFAULT") *> many1 space
-  ((try $ string_ci_ "NULL") *> return Nothing) <|> (str_qt_optional anyChar >>= return . Just)
+aDefaultValue :: (Stream s m Char) => ParsecT s u m (Maybe String)
+aDefaultValue =  do
+  stringCi_ "DEFAULT" *> many1 space
+  (try (stringCi_ "NULL") *> return Nothing) <|> liftM Just (strQuoteOptional anyChar)
 
-a_updatedefaultvalue :: (Stream s m Char) => ParsecT s u m String
-a_updatedefaultvalue = string_ci_ "ON" *> many1 space *> string_ci_ "UPDATE" *> space *> str_qt_optional anyChar
+aUpdateDefaultValue :: (Stream s m Char) => ParsecT s u m String
+aUpdateDefaultValue = stringCi_ "ON" *> many1 space *> stringCi_ "UPDATE" *> space *> strQuoteOptional anyChar
 
-a_comment :: (Stream s m Char) => ParsecT s u m String
-a_comment = string_ci_ "COMMENT" *> many1 space *> str_qt anyChar
+aComment :: (Stream s m Char) => ParsecT s u m String
+aComment = stringCi_ "COMMENT" *> many1 space *> strQuote anyChar
 
-a_autoincrement :: (Stream s m Char) => ParsecT s u m Bool
-a_autoincrement = string_ci_ "AUTO_INCREMENT" *> return True
+aAutoincrement :: (Stream s m Char) => ParsecT s u m Bool
+aAutoincrement = stringCi_ "AUTO_INCREMENT" *> return True
 
-a_pk :: (Stream s m Char) => ParsecT s u m Bool
-a_pk = string_ci_ "PRIMARY" *> many1 space *> string_ci_ "KEY" *> return True
+aPk :: (Stream s m Char) => ParsecT s u m Bool
+aPk = stringCi_ "PRIMARY" *> many1 space *> stringCi_ "KEY" *> return True
 
-a_collate :: (Stream s m Char) => Maybe String -> ParsecT s u m String
-a_collate charset = do
-  string_ci_ "COLLATE"
+aCollate :: (Stream s m Char) => Maybe String -> ParsecT s u m String
+aCollate charset = do
+  stringCi_ "COLLATE"
   many1 space
   cs <- maybe (many1 alphaNum) string charset
   char '_'
-  b <- many1 alphaNum
+  b <- many1 (alphaNum <|> char '_')
   return $ cs ++ "_" ++ b
 
-a_charset :: (Stream s m Char) => ParsecT s u m String
-a_charset = do
-  string_ci_ "CHARACTER"
+aCharset :: (Stream s m Char) => ParsecT s u m String
+aCharset = do
+  stringCi_ "CHARACTER"
   many1 space
-  string_ci_ "SET"
+  stringCi_ "SET"
   many1 space
   many1 (alphaNum <|> char '_')
 
-a_column :: (Stream s m Char) => ParsecT s u m Col
-a_column = do
-  name <- a_columnname
+aColumn :: (Stream s m Char) => ParsecT s u m Col
+aColumn = do
+  name <- aColumnname
   many1 space
-  dataType <- a_dataType
-  charset <- optionMaybe $ try (many1 space *> a_charset)
-  collate <- optionMaybe $ try (many1 space *> a_collate charset)
+  dataType <- aDataType
+  charset <- optionMaybe $ try (many1 space *> aCharset)
+  collate <- optionMaybe $ try (many1 space *> aCollate charset)
   optional $ try (many1 space *> string "zerofill")
-  nullable1 <- optionMaybe  $ try (many1 space *> a_nullable)
-  defaultValue <-  optionMaybe $ try (many1 space *> a_defaultvalue)
-  updateDefaultValue <- optionMaybe $ try (many1 space *> a_updatedefaultvalue)
-  pk <- option False $ try (many1 space *> a_pk)
-  autoIncrement <- option False $ try (many1 space *> a_autoincrement)
-  nullable2 <- optionMaybe $ try (many1 space *> a_nullable)
-  comment <- optionMaybe $ try (many1 space *> a_comment)
-  let nullAble = maybe True Prelude.id $ nullable1 CA.<|> nullable2
+  nullable1 <- optionMaybe  $ try (many1 space *> aNullable)
+  defaultValue <-  optionMaybe $ try (many1 space *> aDefaultValue)
+  updateDefaultValue <- optionMaybe $ try (many1 space *> aUpdateDefaultValue)
+  pk <- option False $ try (many1 space *> aPk)
+  autoIncrement <- option False $ try (many1 space *> aAutoincrement)
+  nullable2 <- optionMaybe $ try (many1 space *> aNullable)
+  comment <- optionMaybe $ try (many1 space *> aComment)
+  let nullAble = fromMaybe True $ nullable1 CA.<|> nullable2
       id = 0
   return Col{..}
 
 data KeyType = PK | UNIQUE_KEY | KEY deriving(Eq, Show)
 
-pk_prefix :: Stream s m Char => ParsecT s u m KeyType
-pk_prefix = string_ci_ "PRIMARY" *> many1 space *> string_ci_ "KEY" *> lookAhead space *> pure PK
+aPkPrefix :: Stream s m Char => ParsecT s u m KeyType
+aPkPrefix = stringCi_ "PRIMARY" *> many1 space *> stringCi_ "KEY" *> lookAhead space *> pure PK
 
-a_pkindex :: Stream s m Char => ParsecT s u m (KeyType, String)
-a_pkindex = pk_prefix *> pure (PK, "PK")
+aPkIndex :: Stream s m Char => ParsecT s u m (KeyType, String)
+aPkIndex = aPkPrefix *> pure (PK, "PK")
 
-pindex_prefix :: Stream s m Char => ParsecT s u m KeyType
-pindex_prefix = do
-  u <- optionMaybe $ (string_ci "UNIQUE" <|> string_ci "FULLTEXT") <* many1 space
-  string_ci_ "KEY" <|> string_ci_ "INDEX"
-  many1 space
+aPlainIndexPrefix :: Stream s m Char => ParsecT s u m KeyType
+aPlainIndexPrefix = do
+  u <- optionMaybe $ (stringCi "UNIQUE" <|> stringCi "FULLTEXT") <* many1 space
+  optional $ (stringCi_ "KEY" <|> stringCi_ "INDEX") <* many1 space
   return $ maybe KEY (const UNIQUE_KEY) u
 
-a_plainindex :: Stream s m Char => ParsecT s u m (KeyType, String)
-a_plainindex = do
-  kt <- pindex_prefix
-  name <- back_qt_optional $ alphaNum <|> char '_' <|> char '+' <|> char '-'
-  return $ (kt, name)
+aPlainIndex :: Stream s m Char => ParsecT s u m (KeyType, String)
+aPlainIndex = do
+  kt <- aPlainIndexPrefix
+  name <- backQuoteOptional $ alphaNum <|> char '_' <|> char '+' <|> char '-'
+  return (kt, name)
 
-a_constraint :: Stream s m Char => ParsecT s u m ()
-a_constraint = do
-  string_ci_ "CONSTRAINT "
+aConstraint :: Stream s m Char => ParsecT s u m ()
+aConstraint = do
+  stringCi_ "CONSTRAINT "
   many1 space
   manyTill anyChar (lookAhead $ char ',' <|> char '\n')
   return ()
 
-a_index :: Stream s m Char => ParsecT s u m Index
-a_index = do
-  (kt, name) <- a_pkindex <|> a_plainindex
+aIndex :: Stream s m Char => ParsecT s u m Index
+aIndex = do
+  (kt, name) <- aPkIndex <|> aPlainIndex
   spaces
-  columns <- paren_between $
-    ((back_qt $ alphaNum <|> char '_') <* (optional $ paren_qt alphaNum)) `sepBy` (char ',' *> spaces)
-  optionMaybe $ try (spaces *> string_ci_ "USING" *> many1 space*> (string_ci_ "BTREE" <|> string_ci_ "HASH"))
+  columns <- parenBetween $
+    ((backQuote $ alphaNum <|> char '_') <* (optional $ parenQuote alphaNum)) `sepBy` (char ',' *> spaces)
+  optionMaybe $ try (spaces *> stringCi_ "USING" *> many1 space*> (stringCi_ "BTREE" <|> stringCi_ "HASH"))
   comment <- optionMaybe $
-    try $ many1 space *> string_ci_ "COMMENT" *> many1 space *> str_qt anyChar
+    try $ many1 space *> stringCi_ "COMMENT" *> many1 space *> strQuote anyChar
   let unique = kt == UNIQUE_KEY
       id = 0
       pk = kt == PK
   return Index{..}
 
-a_key :: Stream s m Char => String -> ParsecT s u m String
-a_key k = (string_ci k) <*  spaces <*  char '=' <* spaces
+aKey :: Stream s m Char => String -> ParsecT s u m String
+aKey k = stringCi k <*  spaces <*  char '=' <* spaces
 
-a_tb_charset :: Stream s m Char => ParsecT s u m String
-a_tb_charset = do
-  optional $ try (string_ci_ "DEFAULT" *> many1 space)
-  a_key "CHARSET"
+aTableCharset :: Stream s m Char => ParsecT s u m String
+aTableCharset = do
+  optional $ try (stringCi_ "DEFAULT" *> many1 space)
+  aKey "CHARSET"
   many1 alphaNum
 
-a_createtable :: Stream s m Char => ParsecT s u m CreateTable
-a_createtable = do
-  string_ci_ "CREATE" *> many1 space *> string_ci_ "TABLE"
+aCreateTable :: Stream s m Char => ParsecT s u m CreateTable
+aCreateTable = do
+  stringCi_ "CREATE" *> many1 space *> stringCi_ "TABLE"
   many1 space
-  tableName <- back_qt_optional $ alphaNum <|> char '_'
+  tableName <- backQuoteOptional $ alphaNum <|> char '_'
   spaces
-  (columns, indices) <- paren_between $ nl_space_around *> column_index_defs <* nl_space_around
+  (columns, indices) <- parenBetween $ nl_space_around *> column_index_defs <* nl_space_around
   spaces
-  engine <- optionMaybe $ try (a_key "ENGINE" *> many1 alphaNum)
-  optional $ try (many1 space *> a_key "AUTO_INCREMENT" *> many1 digit)
-  charset <- optionMaybe $ try (many1 space *> a_tb_charset)
+  engine <- optionMaybe $ try (aKey "ENGINE" *> many1 alphaNum)
+  optional $ try (many1 space *> aKey "AUTO_INCREMENT" *> many1 digit)
+  charset <- optionMaybe $ try (many1 space *> aTableCharset)
   collate <- optionMaybe $ try $ do
     many1 space
-    a_key "COLLATE"
-    cs <- maybe (many1 alphaNum) string_ci charset
+    aKey "COLLATE"
+    cs <- maybe (many1 alphaNum) stringCi charset
     char '_'
     co <- many1 alphaNum
     return $ cs ++ "_" ++ co
-  manyTill anyChar (eof <|> lookAhead ((char ';' >> return ()) <|> try (a_key "COMMENT" >> return ())))
-  comment <- optionMaybe $ try (a_key "COMMENT" *> str_qt anyChar)
-  manyTill anyChar (eof <|> lookAhead (char ';' >> return ()))
+  manyTill anyChar (eof <|> lookAhead (void (char ';') <|> try (void (aKey "COMMENT"))))
+  comment <- optionMaybe $ try (aKey "COMMENT" *> strQuote anyChar)
+  manyTill anyChar (eof <|> lookAhead (void (char ';')))
   return CreateTable{..}
   where
-    column_index_defs = (column_or_index `sepBy` seperator) >>= return . partitionEithers >>= return . fmap (map fromJust . filter isJust)
-    column_or_index = (try a_constraint >> return (Right Nothing))
-                      <|> (try a_index >>= return . Right . Just)
-                      <|> (a_column >>= return . Left)
-    seperator = try (spaces *> (char ',') *> spaces *> (optional $ char '\n') *> spaces)
-    nl_space_around = spaces *> (optional $ char '\n') *> spaces
+    column_index_defs = liftM (fmap catMaybes . partitionEithers) (column_or_index `sepBy` seperator)
+    column_or_index = (try aConstraint >> return (Right Nothing))
+                      <|> liftM (Right . Just) (try aIndex)
+                      <|> liftM Left aColumn
+    seperator = try (spaces *> char ',' *> spaces *> optional (char '\n') *> spaces)
+    nl_space_around = spaces *> optional (char '\n') *> spaces
 
-a_tables :: Stream s m Char => ParsecT s u m [CreateTable]
-a_tables = a_createtable `endBy` (eof <|> (char ';' *> optional (char '\n')))
+aTables :: Stream s m Char => ParsecT s u m [CreateTable]
+aTables = aCreateTable `endBy` (eof <|> (char ';' *> optional (char '\n')))
