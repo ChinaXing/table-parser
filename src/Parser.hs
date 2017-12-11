@@ -58,7 +58,7 @@ data CreateTable = CreateTable
 --createTable :: GenParser Char st CreateTable
 
 stopChars :: (Stream s m Char) => ParsecT s u m Char
-stopChars = char '\n' <|> char ',' <|> char ')' <|> char ' '
+stopChars = char ' ' <|> char '\n' <|> char ',' <|> char ')' <|> char '('
 
 stringCi :: (Stream s m Char) => String -> ParsecT s u m String
 stringCi s = liftM reverse (foldM (\r c -> liftM (:r) (satisfy (\c' -> c' == c || (toUpper c' == toUpper c)))) [] s)
