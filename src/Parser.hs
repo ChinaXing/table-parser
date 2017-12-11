@@ -57,14 +57,26 @@ data CreateTable = CreateTable
 
 --createTable :: GenParser Char st CreateTable
 
+stopChars :: (Stream s m Char) => ParsecT s u m Char
+stopChars = char '\n' <|> char ',' <|> char ')' <|> char ' '
+
 stringCi :: (Stream s m Char) => String -> ParsecT s u m String
 stringCi s = liftM reverse (foldM (\r c -> liftM (:r) (satisfy (\c' -> c' == c || (toUpper c' == toUpper c)))) [] s)
 
 stringCi_ :: (Stream s m Char) => String -> ParsecT s u m ()
 stringCi_ = foldM (\() c -> void (satisfy (\c' -> c' == c || (toUpper c' == toUpper c)))) ()
 
+escape :: (Stream s m Char) => ParsecT s u m (Maybe Char)
+escape = optionMaybe (try (char '\'' <* lookAhead (char '\'')))
+
 qt :: (Stream s m Char) => Char -> Char -> ParsecT s u m a -> ParsecT s u m [a]
-qt l r p = char l *> manyTill p (char r)
+qt l r p = char l *> scan <* char r
+  where
+    scan = do
+      esc <- escape
+      case esc of
+        Nothing -> (lookAhead (char r) *> return []) <|> ((:) <$> p <*> scan)
+        Just _ -> (:) <$> p <*> scan
 
 parenBetween :: Stream s m Char => ParsecT s u m a -> ParsecT s u m a
 parenBetween = between (char '(') (char ')')
@@ -76,16 +88,16 @@ choice' :: Stream s m  Char => [ParsecT s u m a] -> ParsecT s u m a
 choice' = foldl (\r i -> r <|> try i) CA.empty
 
 quoteOptional :: Stream s m Char => Char -> Char -> ParsecT s u m a -> ParsecT s u m [a]
-quoteOptional l r p = qt l r p <|> manyTill p (lookAhead $ oneOf "\n,) ")
+quoteOptional l r p = qt l r p <|> manyTill p (lookAhead stopChars)
 
 singleQuote :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
 singleQuote  = qt '\'' '\''
 
 singleQuoteOptional :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
-singleQuoteOptional p = singleQuote p <|> manyTill p (lookAhead $ oneOf "\n,) ")
+singleQuoteOptional p = singleQuote p <|> manyTill p (lookAhead stopChars)
 
 strQuoteOptional :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
-strQuoteOptional p = strQuote p <|> manyTill p (lookAhead $ oneOf "\n,) ")
+strQuoteOptional p = strQuote p <|> manyTill p (lookAhead stopChars)
 
 parenQuote :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
 parenQuote = qt '(' ')'
@@ -94,7 +106,7 @@ backQuote :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
 backQuote = qt '`' '`'
 
 backQuoteOptional :: Stream s m Char => ParsecT s u m a  -> ParsecT s u m [a]
-backQuoteOptional p = qt '`' '`' p <|> manyTill p (lookAhead $ oneOf "\n,) ")
+backQuoteOptional p = qt '`' '`' p <|> manyTill p (lookAhead stopChars)
 
 aDataTypeOptionalLength :: (Stream s m Char) => String -> ParsecT s u m String
 aDataTypeOptionalLength ts = stringCi ts <* optional (parenQuote digit)
