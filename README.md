@@ -1,3 +1,3 @@
 # table-parser
 
-https://travis-ci.org/ChinaXing/table-parser.svg?branch=master
+[![Build Status](https://travis-ci.org/ChinaXing/table-parser.svg?branch=master)]
