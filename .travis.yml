@@ -8,7 +8,7 @@ cache:
     - $HOME/.stack
 
 before_install:
-  - export PATH=$HOME/.local/bin
+  - export PATH=$HOME/.local/bin:$PATH
   - curl -sL https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
 
 install:
