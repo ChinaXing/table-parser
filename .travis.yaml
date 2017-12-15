@@ -1,3 +1,19 @@
 language: generic
 sudo: false
 
+cache:
+  directories:
+    - $HOME/.ghc
+    - $HOME/.cabal
+    - $HOME/.stack
+
+before_install:
+  - export PATH=$HOME/.local/bin
+  - curl -sL https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+
+install:
+  - stack --no-terminal build
+  - stack --no-terminal test --only-dependencies
+
+script:
+  - stack --no-terminal test
