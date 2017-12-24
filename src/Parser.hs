@@ -1,10 +1,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Parser (aCreateTable, aTables, DataType(..), Col(..), Index(..), CreateTable(..)) where
+module Parser (aCreateTable, aTables) where
 
+import Model
 import Text.Parsec.Prim
 import Text.Parsec.Combinator
 import Text.Parsec.Char
@@ -14,48 +14,6 @@ import Data.Either
 import Control.Monad
 import qualified Data.List as DL
 import qualified Control.Applicative as CA (Alternative(empty), (<|>))
-
-
-data DataType = DataType
-  { t :: String
-  , len :: Maybe Int
-  , unsigned :: Bool
-  } deriving(Eq, Show)
-
-data Col = Col
-  { id :: Int
-  , name :: String
-  , dataType :: DataType
-  , charset :: Maybe String
-  , collate :: Maybe String
-  , pk :: Bool
-  , autoIncrement :: Bool
-  , nullAble :: Bool
-  , defaultValue :: Maybe (Maybe String)
-  , updateDefaultValue :: Maybe String
-  , comment :: Maybe String
-  } deriving(Eq, Show)
-
-data Index = Index
-  { id :: Int
-  , name :: String
-  , columns :: [String]
-  , unique :: Bool
-  , pk :: Bool
-  , comment :: Maybe String
-  } deriving(Eq, Show)
-
-data CreateTable = CreateTable
-  { tableName :: String
-  , columns :: [Col]
-  , indices :: [Index]
-  , comment :: Maybe String
-  , charset :: Maybe String
-  , collate :: Maybe String
-  , engine :: Maybe String
-  } deriving(Eq, Show)
-
---createTable :: GenParser Char st CreateTable
 
 stopChars :: (Stream s m Char) => ParsecT s u m Char
 stopChars = char ' ' <|> char '\n' <|> char ',' <|> char ')' <|> char '('
@@ -303,7 +261,7 @@ aIndex = do
   (kt, name) <- aPkIndex <|> aPlainIndex
   spaces
   columns <- parenBetween $
-    ((backQuote $ alphaNum <|> char '_') <* (optional $ parenQuote alphaNum)) `sepBy` (char ',' *> spaces)
+    (backQuote (alphaNum <|> char '_') <* optional (parenQuote alphaNum)) `sepBy` (char ',' *> spaces)
   optionMaybe $ try (spaces *> stringCi_ "USING" *> many1 space*> (stringCi_ "BTREE" <|> stringCi_ "HASH"))
   comment <- optionMaybe $
     try $ many1 space *> stringCi_ "COMMENT" *> many1 space *> strQuote anyChar

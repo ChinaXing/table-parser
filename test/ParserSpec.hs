@@ -3,6 +3,7 @@ module ParserSpec where
 
 import Test.Hspec
 import Parser
+import Model
 import System.Directory
 import Text.Parsec
 import Control.Monad.IO.Class

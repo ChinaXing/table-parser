@@ -7,6 +7,7 @@ module TableParser where
 import qualified Text.Parsec as P;
 import qualified Data.ByteString.Lazy.UTF8 as BLU
 import Parser
+import Model
 import Data.Aeson
 
 parse :: String -> Either P.ParseError [CreateTable]

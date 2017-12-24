@@ -17,6 +17,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     TableParser
                      , Parser
+                     , Model
   build-depends:       base >= 4.7 && < 5
                      , aeson
                      , utf8-string
