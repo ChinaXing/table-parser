@@ -15,8 +15,15 @@ import Control.Monad
 import qualified Data.List as DL
 import qualified Control.Applicative as CA (Alternative(empty), (<|>))
 
+
+whiteChar :: (Stream s m Char) => ParsecT s u m Char
+whiteChar = char ' ' <|> char '\n' <|> char '\t' <|> char '\r'
+
+whiteChars :: (Stream s m Char) => ParsecT s u m String
+whiteChars = many whiteChar
+
 stopChars :: (Stream s m Char) => ParsecT s u m Char
-stopChars = char ' ' <|> char '\n' <|> char ',' <|> char ')' <|> char '('
+stopChars = whiteChar <|> char ',' <|> char ')' <|> char '('
 
 stringCi :: (Stream s m Char) => String -> ParsecT s u m String
 stringCi s = liftM reverse (foldM (\r c -> liftM (:r) (satisfy (\c' -> c' == c || (toUpper c' == toUpper c)))) [] s)
@@ -281,9 +288,8 @@ aTableCharset = do
 
 aCreateTable :: Stream s m Char => ParsecT s u m CreateTable
 aCreateTable = do
-  stringCi_ "CREATE" *> many1 space *> stringCi_ "TABLE"
-  many1 space
-  tableName <- backQuoteOptional $ alphaNum <|> char '_'
+  whiteChars
+  tableName <- create_table_name
   spaces
   (columns, indices) <- parenBetween $ nl_space_around *> column_index_defs <* nl_space_around
   spaces
@@ -302,12 +308,14 @@ aCreateTable = do
   manyTill anyChar (eof <|> lookAhead (void (char ';')))
   return CreateTable{..}
   where
+    create_table_kw = stringCi_ "CREATE" *> many1 space *> stringCi_ "TABLE"
+    create_table_name = create_table_kw *> many1 space *> backQuoteOptional (alphaNum <|> char '_')
     column_index_defs = liftM (fmap catMaybes . partitionEithers) (column_or_index `sepBy` seperator)
-    column_or_index = (try aConstraint >> return (Right Nothing))
+    column_or_index = liftM (const (Right Nothing)) (try aConstraint)
                       <|> liftM (Right . Just) (try aIndex)
                       <|> liftM Left aColumn
     seperator = try (spaces *> char ',' *> spaces *> optional (char '\n') *> spaces)
     nl_space_around = spaces *> optional (char '\n') *> spaces
 
 aTables :: Stream s m Char => ParsecT s u m [CreateTable]
-aTables = aCreateTable `endBy` (eof <|> (char ';' *> optional (char '\n')))
+aTables = aCreateTable `endBy` (eof <|> (char ';' *> optional whiteChars))
