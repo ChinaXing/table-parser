@@ -15,7 +15,6 @@ import Control.Monad
 import qualified Data.List as DL
 import qualified Control.Applicative as CA (Alternative(empty), (<|>))
 
-
 whiteChar :: (Stream s m Char) => ParsecT s u m Char
 whiteChar = char ' ' <|> char '\n' <|> char '\t' <|> char '\r'
 
@@ -267,8 +266,10 @@ aIndex :: Stream s m Char => ParsecT s u m Index
 aIndex = do
   (kt, name) <- aPkIndex <|> aPlainIndex
   spaces
-  columns <- parenBetween $
-    (backQuote (alphaNum <|> char '_') <* optional (parenQuote alphaNum)) `sepBy` (char ',' *> spaces)
+  columns <- parenBetween $ (
+    IndexCol <$> backQuote (alphaNum <|> char '_')
+      <*> liftM (fmap read) (optionMaybe (parenQuote alphaNum))
+    ) `sepBy` (char ',' *> spaces)
   optionMaybe $ try (spaces *> stringCi_ "USING" *> many1 space*> (stringCi_ "BTREE" <|> stringCi_ "HASH"))
   comment <- optionMaybe $
     try $ many1 space *> stringCi_ "COMMENT" *> many1 space *> strQuote anyChar

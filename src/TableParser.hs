@@ -49,6 +49,9 @@ instance ToJSON Col where
     , "comment" .= maybe Null toJSON comment
     ]
 
+instance ToJSON IndexCol where
+  toJSON IndexCol{..} = object [ "colName" .= colName, "prefix" .= prefix]
+
 instance ToJSON Index where
   toJSON Index{..} = object
     [ "id" .= id

@@ -21,10 +21,12 @@ data Col = Col
   , comment :: Maybe String
   } deriving(Eq, Show)
 
+data IndexCol = IndexCol { colName :: String, prefix :: Maybe Int } deriving (Eq, Show)
+
 data Index = Index
   { id :: Int
   , name :: String
-  , columns :: [String]
+  , columns :: [IndexCol]
   , unique :: Bool
   , pk :: Bool
   , comment :: Maybe String
